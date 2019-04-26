@@ -1,41 +1,51 @@
-<template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <p>
-      For a guide and recipes on how to configure / customize this project,<br>
-      check out the
-      <a href="https://cli.vuejs.org" target="_blank" rel="noopener">vue-cli documentation</a>.
-    </p>
-    <h3>Installed CLI Plugins</h3>
-    <ul>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-babel" target="_blank" rel="noopener">babel</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-typescript" target="_blank" rel="noopener">typescript</a></li>
-    </ul>
-    <h3>Essential Links</h3>
-    <ul>
-      <li><a href="https://vuejs.org" target="_blank" rel="noopener">Core Docs</a></li>
-      <li><a href="https://forum.vuejs.org" target="_blank" rel="noopener">Forum</a></li>
-      <li><a href="https://chat.vuejs.org" target="_blank" rel="noopener">Community Chat</a></li>
-      <li><a href="https://twitter.com/vuejs" target="_blank" rel="noopener">Twitter</a></li>
-      <li><a href="https://news.vuejs.org" target="_blank" rel="noopener">News</a></li>
-    </ul>
-    <h3>Ecosystem</h3>
-    <ul>
-      <li><a href="https://router.vuejs.org" target="_blank" rel="noopener">vue-router</a></li>
-      <li><a href="https://vuex.vuejs.org" target="_blank" rel="noopener">vuex</a></li>
-      <li><a href="https://github.com/vuejs/vue-devtools#vue-devtools" target="_blank" rel="noopener">vue-devtools</a></li>
-      <li><a href="https://vue-loader.vuejs.org" target="_blank" rel="noopener">vue-loader</a></li>
-      <li><a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">awesome-vue</a></li>
-    </ul>
-  </div>
+<template lang='pug'>
+  .app
+    article(v-if='gists.length' v-for='gist in gists')
+      h2 {{gist.title}}
+      vue-markdown {{gist.content}}
+      small by {{gist.author}} on {{gist.date}}
+    
 </template>
 
 <script lang="ts">
 import { Component, Prop, Vue } from 'vue-property-decorator';
+import VueMarkdown from 'vue-markdown';
 
-@Component
+@Component({
+  components: {
+    VueMarkdown,
+  },
+})
 export default class HelloWorld extends Vue {
+
+  public gists = [];
   @Prop() private msg!: string;
+
+  public async mounted() {
+    await this.fetchData();
+  }
+
+  public async fetchData() {
+    const BASE_URL = 'https://api.github.com';
+    const axios = (this as any).$axios;
+    const gistList = await axios.get(
+      `${BASE_URL}/users/powerstack-consulting/gists`,
+    );
+    const gistPromises = gistList.data.map((gist: { id: string }) => {
+      return axios.get(`${BASE_URL}/gists/${gist.id}`);
+    });
+    const resp = await Promise.all(gistPromises);
+    (this as any).gists = resp.map((item: any) => {
+      const meta = JSON.parse(item.data.files['meta.json'].content);
+      const content = item.data.files['content.md'].content;
+      return {
+        content,
+        title: meta.title,
+        author: meta.author,
+        date: meta.date,
+      };
+    });
+  }
 }
 </script>
 
